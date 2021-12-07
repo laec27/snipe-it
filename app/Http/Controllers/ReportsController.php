@@ -18,6 +18,8 @@ use Illuminate\Support\Facades\View;
 use Input;
 use League\Csv\Reader;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Auth;
+use Illuminate\Support\Facades\Log;
 
 /**
  * This controller handles all actions related to Reports for
@@ -44,7 +46,28 @@ class ReportsController extends Controller
     public function getAccessoryReport()
     {
         $this->authorize('reports.view');
-        $accessories = Accessory::orderBy('created_at', 'DESC')->with('company')->get();
+
+        $myArr = array();
+        $userData = Auth::user()->isAdminofGroup();
+
+        foreach($userData as $id => $group){
+            array_push($myArr,$id);
+        }
+
+       // $accessories = Accessory::orderBy('created_at', 'DESC')->with('company')->get();
+
+       $accessories = Accessory::with('company', 'groups');
+
+       if(Auth::user()->isSuperUser()){
+        }else{
+            $accessories->whereHas('groups', function($query) use ($myArr){
+                $query->whereIn('group_id', $myArr);
+            })->get();
+            
+        }
+
+        $accessories->orderBy('created_at', 'DESC');
+        $accessories = $accessories->get();
         return view('reports/accessories', compact('accessories'));
     }
 
@@ -101,8 +124,33 @@ class ReportsController extends Controller
     public function getDeprecationReport()
     {
         $this->authorize('reports.view');
+
+        $this->authorize('index', Asset::class);
+        $myArr = array();
+        $userData = Auth::user()->isAdminofGroup();
+
+        foreach($userData as $id => $group){
+            array_push($myArr,$id);
+        }
+
+
         $depreciations = Depreciation::get();
-        return view('reports/depreciation')->with('depreciations',$depreciations);
+        //Grab all the assets
+        // $assets = Asset::with( 'assignedTo', 'assetstatus', 'defaultLoc', 'location', 'company', 'model.category', 'model.depreciation')
+        //                ->orderBy('created_at', 'DESC')->get();
+
+        $assets = Asset::with( 'assignedTo', 'assetstatus', 'defaultLoc', 'location', 'company', 'model.category', 'model.depreciation', 'groups');
+
+        if(Auth::user()->isSuperUser()){
+        }else{
+            $assets->whereHas('groups', function($query) use ($myArr){
+                $query->whereIn('group_id', $myArr);
+            })->get();
+        }
+
+        $assets = $assets->orderBy('created_at', 'DESC')->get();
+
+        return view('reports/depreciation', compact('assets'))->with('depreciations',$depreciations);
     }
 
     /**
@@ -283,6 +331,8 @@ class ReportsController extends Controller
                         ($actionlog->note) ? e($actionlog->note): '',
                         $actionlog->log_meta,
                     ];
+
+                    Log::debug($actionlog->itemType());
                     fputcsv($handle, $row);
 
                 }
@@ -316,9 +366,25 @@ class ReportsController extends Controller
     public function getLicenseReport()
     {
         $this->authorize('reports.view');
-        $licenses = License::with('depreciation')->orderBy('created_at', 'DESC')
-                           ->with('company')
-                           ->get();
+        $myArr = array();
+        $userData = Auth::user()->isAdminofGroup();
+
+        foreach($userData as $id => $group){
+            array_push($myArr,$id);
+        }
+
+        $licenses = License::with('depreciation', 'company', 'groups');
+
+        if(Auth::user()->isSuperUser()){
+        }else{
+            $licenses->whereHas('groups', function($query) use ($myArr){
+                $query->whereIn('group_id', $myArr);
+            })->get();
+            
+        }
+
+        $licenses->orderBy('created_at', 'DESC');
+        $licenses = $licenses->get();
 
         return view('reports/licenses', compact('licenses'));
     }
@@ -564,16 +630,26 @@ class ReportsController extends Controller
                 }
             }
 
+            if ($request->filled('group')) {
+                $header[] = 'Group';
+            }
+
             $executionTime = microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"];
             \Log::debug('Starting headers: '.$executionTime);
             fputcsv($handle, $header);
             $executionTime = microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"];
             \Log::debug('Added headers: '.$executionTime);
 
+            $myArr = array();
+            $userData = Auth::user()->isAdminofGroup();
+
+            foreach($userData as $id => $group){
+                array_push($myArr,$id);
+            }
 
             $assets = \App\Models\Company::scopeCompanyables(Asset::select('assets.*'))->with(
                 'location', 'assetstatus', 'assetlog', 'company', 'defaultLoc','assignedTo',
-                'model.category', 'model.manufacturer','supplier');
+                'model.category', 'model.manufacturer','supplier', 'groups');
             
             if ($request->filled('by_location_id')) {
                 $assets->where('assets.location_id', $request->input('by_location_id'));
@@ -636,6 +712,14 @@ class ReportsController extends Controller
             if (($request->filled('next_audit_start')) && ($request->filled('next_audit_end'))) {
                 $assets->whereBetween('assets.next_audit_date', [$request->input('next_audit_start'), $request->input('next_audit_end')]);
             }
+
+            if(Auth::user()->isSuperUser()){
+            }else{
+                $assets->whereHas('groups', function($query) use ($myArr){
+                    $query->whereIn('group_id', $myArr);
+                })->get();
+            }
+
             
             $assets->orderBy('assets.id', 'ASC')->chunk(20, function($assets) use($handle, $customfields, $request) {
 
@@ -816,6 +900,13 @@ class ReportsController extends Controller
                             $row[] = $asset->$column_name;
                         }
                     }
+
+                    if($request->filled('group')){
+                        foreach($asset->groups as $group)
+                        {
+                            $row[] = $group->name;
+                        }
+                    }
                     fputcsv($handle, $row);
                     $executionTime = microtime(true) - $_SERVER["REQUEST_TIME_FLOAT"];
                     \Log::debug('-- Record '.$count.' Asset ID:' .$asset->id. ' in '. $executionTime);
@@ -858,6 +949,10 @@ class ReportsController extends Controller
 
         return view('reports/asset_maintenances', compact('assetMaintenances'));
 
+    }
+
+    public function getGroups(){
+        
     }
 
     /**
@@ -935,7 +1030,13 @@ class ReportsController extends Controller
         /**
          * Get all assets with pending checkout acceptances
          */
+        $myArr = array();
+        $userData = Auth::user()->isAdminofGroup();
 
+        foreach($userData as $id => $group){
+            array_push($myArr,$id);
+        }
+        
         $acceptances = CheckoutAcceptance::pending()->get();
 
         $assetsForReport = $acceptances
@@ -946,7 +1047,29 @@ class ReportsController extends Controller
                 return $acceptance->checkoutable;
             });
 
-        return view('reports/unaccepted_assets', compact('assetsForReport'));
+            $acceptances = [];
+
+            foreach($assetsForReport as $asset) {
+                if(!Auth::user()->isSuperUser()){
+                    $asset_grp_id = $asset->groups;
+                    $assetGrpArr = array();
+                    
+                    foreach ($asset_grp_id as $group){
+                        array_push($assetGrpArr,$group->id);
+                    }
+                    $result = count(array_intersect($myArr, $assetGrpArr));
+                    
+                    if($result!=0){
+                        $acceptances[] = $asset;
+                    }
+                }else{
+                    $acceptances[] = $asset; 
+                }
+            }
+          
+        //Log::debug($assetsForReport);
+
+        return view('reports/unaccepted_assets', compact('acceptances'));
     }
 
     /**

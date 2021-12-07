@@ -10,6 +10,7 @@ use App\Models\Company;
 use App\Models\Consumable;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Auth;
 use App\Http\Requests\ImageUploadRequest;
 
 class ConsumablesController extends Controller
@@ -25,6 +26,12 @@ class ConsumablesController extends Controller
     public function index(Request $request)
     {
         $this->authorize('index', Consumable::class);
+	$myArr = array();
+        $userData = Auth::user()->groups;
+
+        foreach($userData as $userGroup){
+            array_push($myArr,$userGroup->id);
+        }
 
         // This array is what determines which fields should be allowed to be sorted on ON the table itself, no relations
         // Relations will be handled in query scopes a little further down.
@@ -47,7 +54,7 @@ class ConsumablesController extends Controller
 
         $consumables = Company::scopeCompanyables(
             Consumable::select('consumables.*')
-                ->with('company', 'location', 'category', 'users', 'manufacturer')
+                ->with('company', 'location', 'category', 'users', 'manufacturer', 'groups')
         );
 
         if ($request->filled('search')) {
@@ -72,6 +79,13 @@ class ConsumablesController extends Controller
 
         if ($request->filled('location_id')) {
             $consumables->where('location_id','=',$request->input('location_id'));
+        }
+	if(Auth::user()->isSuperUser()){
+        }else{
+            $consumables->whereHas('groups', function($query) use ($myArr){
+                $query->whereIn('group_id', $myArr);
+            })->get();
+            
         }
 
 

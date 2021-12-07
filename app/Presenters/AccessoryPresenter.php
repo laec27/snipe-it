@@ -103,6 +103,13 @@ class AccessoryPresenter extends Presenter
                 "sortable" => true,
                 "title" => trans('general.purchase_cost'),
                 "footerFormatter" => 'sumFormatter',
+            ],[
+                "field" => "groups",
+                "searchable" => true,
+                "sortable" => true,
+                "title" => trans('general.groups'),
+                "visible" => true,
+                "formatter" => "groupsFormatter"
             ], [
                 "field" => "order_number",
                 "searchable" => true,

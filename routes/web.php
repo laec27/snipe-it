@@ -39,7 +39,7 @@ Route::group(['middleware' => 'auth'], function () {
 
     Route::group([ 'prefix' => 'manufacturers', 'middleware' => ['auth'] ], function () {
 
-        Route::post('{manufacturers_id}/restore', [ 'as' => 'restore/manufacturer', 'uses' => 'ManufacturersController@restore']);
+        Route::get('{manufacturers_id}/restore', [ 'as' => 'restore/manufacturer', 'uses' => 'ManufacturersController@restore']);
     });
 
     Route::resource('manufacturers', 'ManufacturersController', [
@@ -125,12 +125,21 @@ Route::group(['middleware' => 'auth'], function () {
 |
 */
 
+Route::group([ 'prefix' => 'admin','middleware' => ['auth']], function () {
 
+    Route::middleware(['authorize:admin'])->group(function () {
+        Route::get('groups', ['as' => 'settings.groups.index','uses' => 'GroupsController@index' ]);
 
-Route::group([ 'prefix' => 'admin','middleware' => ['auth', 'authorize:superuser']], function () {
+        Route::resource('groups', 'GroupsController', [
+            'middleware' => ['auth'],
+            'parameters' => ['group' => 'group_id']
+        ]);
+    });
 
-    Route::get('settings', ['as' => 'settings.general.index','uses' => 'SettingsController@getSettings' ]);
-    Route::post('settings', ['as' => 'settings.general.save','uses' => 'SettingsController@postSettings' ]);
+    Route::middleware(['authorize:superuser'])->group(function () {
+         
+        Route::get('settings', ['as' => 'settings.general.index','uses' => 'SettingsController@getSettings' ]);
+        Route::post('settings', ['as' => 'settings.general.save','uses' => 'SettingsController@postSettings' ]);
 
 
     Route::get('branding', ['as' => 'settings.branding.index','uses' => 'SettingsController@getBranding' ]);
@@ -202,6 +211,14 @@ Route::group([ 'prefix' => 'admin','middleware' => ['auth', 'authorize:superuser
 
     Route::get('/', ['as' => 'settings.index', 'uses' => 'SettingsController@index' ]);
 
+        Route::get('ldapGroup',
+            [
+                'as' => 'ldap.usergroup',
+                'uses' => '\App\Http\Controllers\Users\LDAPGroupImportController@create'
+            ]
+        );
+
+    });
 
 });
 

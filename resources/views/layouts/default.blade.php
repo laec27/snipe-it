@@ -402,6 +402,15 @@
               </a>
             </li>
             @endcan
+
+            @can('admin')
+            <li>
+              <a href="{{ route('groups.index') }}">
+                <i class="fa fa-group" aria-hidden="true"></i> <span>Groups</span>
+              </a>
+            </li>
+            @endcan
+
             @can('index', \App\Models\Asset::class)
             <li class="treeview{{ (Request::is('hardware*') ? ' active' : '') }}">
                 <a href="#"><i class="fa fa-barcode" aria-hidden="true"></i>

@@ -3,6 +3,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Events\CheckoutableCheckedIn;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use App\Helpers\Helper;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AssetCheckoutRequest;
@@ -74,7 +75,12 @@ class AssetsController extends Controller
         } else {
             $transformer = 'App\Http\Transformers\AssetsTransformer';
             $this->authorize('index', Asset::class);          
-        }
+	    $myArr =array();
+            $userData = Auth::user()->groups;
+
+            foreach($userData as $userGroup){
+            	array_push($myArr,$userGroup->id);
+            }
         
        
         $settings = Setting::getSettings();
@@ -116,7 +122,7 @@ class AssetsController extends Controller
 
         $assets = Company::scopeCompanyables(Asset::select('assets.*'),"company_id","assets")
             ->with('location', 'assetstatus', 'assetlog', 'company', 'defaultLoc','assignedTo',
-                'model.category', 'model.manufacturer', 'model.fieldset','supplier');
+                'model.category', 'model.manufacturer', 'model.fieldset','supplier', 'groups');
 
         
         // These are used by the API to query against specific ID numbers.
@@ -166,6 +172,18 @@ class AssetsController extends Controller
         if ($request->filled('depreciation_id')) {
             $assets->ByDepreciationId($request->input('depreciation_id'));
         }
+
+        if(Auth::user()->isSuperUser()){
+        }else{
+            $assets->whereHas('groups', function($query) use ($myArr){
+                $query->whereIn('group_id', $myArr);
+            })->get();
+        }
+
+        // $query = http_build_query(array('assets.groupid' => $myArr));
+        // Log::debug($query);
+        // $assets->where('assets.groupid', '=', $myArr[0])
+        //         ->where('assets.groupid', '=', $myArr[1]);
 
         $request->filled('order_number') ? $assets = $assets->where('assets.order_number', '=', e($request->get('order_number'))) : '';
 
@@ -239,7 +257,7 @@ class AssetsController extends Controller
                             ->where('status_alias.pending','=',0)
                             ->where('status_alias.archived', '=', 0);
                     });
-
+                    Log::debug($assets->count());
                 break;
             case 'Deployed':
                 // more sad, horrible workarounds for laravel bugs when doing full text searches
@@ -591,6 +609,8 @@ class AssetsController extends Controller
     {
         $this->authorize('update', Asset::class);
 
+        Log::debug('clone');
+
         if ($asset = Asset::find($id)) {
             $asset->fill($request->all());
 
@@ -931,9 +951,23 @@ class AssetsController extends Controller
     {
         $this->authorize('viewRequestable', Asset::class);
 
+        $myArr = array();
+        $userData = Auth::user()->groups;
+
+        foreach($userData as $userGroup){
+            array_push($myArr,$userGroup->id);
+        }
+
         $assets = Company::scopeCompanyables(Asset::select('assets.*'),"company_id","assets")
             ->with('location', 'assetstatus', 'assetlog', 'company', 'defaultLoc','assignedTo',
-                'model.category', 'model.manufacturer', 'model.fieldset','supplier')->where('assets.requestable', '=', '1');
+                'model.category', 'model.manufacturer', 'model.fieldset','supplier','groups')->where('assets.requestable', '=', '1');
+
+        if(Auth::user()->isSuperUser()){
+        }else{
+            $assets->whereHas('groups', function($query) use ($myArr){
+                $query->whereIn('group_id', $myArr);
+            })->get();
+        }
 
         $offset = request('offset', 0);
         $limit = $request->input('limit', 50);

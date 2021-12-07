@@ -143,7 +143,7 @@ class AssetFilesController extends Controller
                 $log->delete();
                 return redirect()->back()->with('success', trans('admin/hardware/message.deletefile.success'));
             }
-
+            $log->delete();
             return redirect()->back()
                 ->with('success', trans('admin/hardware/message.deletefile.success'));
         }

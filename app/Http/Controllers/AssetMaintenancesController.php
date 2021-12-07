@@ -68,6 +68,13 @@ class AssetMaintenancesController extends Controller
     {
         $asset = null;
 
+        $myArr = array();
+        $userData = Auth::user()->groups;
+
+        foreach($userData as $userGroup){
+            array_push($myArr,$userGroup->id);
+        }
+
         if ($asset = Asset::find(request('asset_id'))) {
             // We have to set this so that the correct property is set in the select2 ajax dropdown
             $asset->asset_id = $asset->id;

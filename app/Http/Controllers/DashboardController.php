@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\AdminController;
 use Auth;
 use View;
+use Illuminate\Support\Facades\Log;
 
 /**
  * This controller handles all actions related to the Admin Dashboard
@@ -28,11 +29,38 @@ class DashboardController extends Controller
 
             $asset_stats=null;
 
-            $counts['asset'] = \App\Models\Asset::count();
-            $counts['accessory'] = \App\Models\Accessory::count();
-            $counts['license'] = \App\Models\License::assetcount();
-            $counts['consumable'] = \App\Models\Consumable::count();
-            $counts['grand_total'] =  $counts['asset'] +  $counts['accessory'] +  $counts['license'] +  $counts['consumable'];
+            $myArr = array();
+            $userData = Auth::user()->isAdminofGroup();
+
+            foreach($userData as $id => $group){
+                array_push($myArr,$id);
+            }
+
+            if(Auth::user()->isSuperUser()){
+                $counts['asset'] = \App\Models\Asset::count();
+                $counts['accessory'] = \App\Models\Accessory::count();
+                $counts['license'] = \App\Models\License::assetcount();
+                $counts['consumable'] = \App\Models\Consumable::count();
+                $counts['grand_total'] =  $counts['asset'] +  $counts['accessory'] +  $counts['license'] +  $counts['consumable'];
+
+            }else{
+
+                $counts['asset'] = \App\Models\Asset::whereHas('groups', function($query) use ($myArr){
+                    $query->whereIn('group_id', $myArr);
+                })->count();
+
+                $counts['accessory'] = \App\Models\Accessory::whereHas('groups', function($query) use ($myArr){
+                    $query->whereIn('group_id', $myArr);
+                })->count();
+
+                $counts['license'] = \App\Models\License::assetcount();
+                
+                $counts['consumable'] = \App\Models\Consumable::whereHas('groups', function($query) use ($myArr){
+                    $query->whereIn('group_id', $myArr);
+                })->count();
+
+                $counts['grand_total'] =  $counts['asset'] +  $counts['accessory'] +  $counts['license'] +  $counts['consumable'];
+            }
 
             if ((!file_exists(storage_path().'/oauth-private.key')) || (!file_exists(storage_path().'/oauth-public.key'))) {
                 \Artisan::call('migrate', ['--force' => true]);

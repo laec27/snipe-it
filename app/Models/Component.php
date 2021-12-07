@@ -80,6 +80,7 @@ class Component extends SnipeModel
         'category'     => ['name'],
         'company'      => ['name'],
         'location'     => ['name'],
+        'groups'       => ['name']
     ];
 
     /**
@@ -154,6 +155,11 @@ class Component extends SnipeModel
     public function assetlog()
     {
         return $this->hasMany('\App\Models\Actionlog', 'item_id')->where('item_type', Component::class)->orderBy('created_at', 'desc')->withTrashed();
+    }
+
+    public function groups()
+    {
+        return $this->belongsToMany('\App\Models\Group', 'components_groups');
     }
 
     /**

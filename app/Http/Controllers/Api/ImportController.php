@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use League\Csv\Reader;
 use Symfony\Component\HttpFoundation\File\Exception\FileException;
+use Illuminate\Support\Facades\Log;
 
 class ImportController extends Controller
 {
@@ -40,6 +41,7 @@ class ImportController extends Controller
     public function store()
     {
         $this->authorize('import');
+        Log::debug('import store');
         if (!config('app.lock_passwords')) {
             $files = Request::file('files');
             $path = config('app.private_uploads').'/imports';
@@ -120,6 +122,7 @@ class ImportController extends Controller
     public function process(ItemImportRequest $request, $import_id)
     {
         $this->authorize('import');
+        Log::debug('import process');
 
         // Run a backup immediately before processing
         if ($request->has('run-backup')) {

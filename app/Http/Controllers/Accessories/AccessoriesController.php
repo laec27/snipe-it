@@ -9,6 +9,9 @@ use App\Models\Company;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Redirect;
+use App\Models\User;
+use App\Models\Group;
+use Illuminate\Support\Facades\Log;
 
 /** This controller handles all actions related to Accessories for
  * the Snipe-IT Asset Management application.
@@ -44,9 +47,19 @@ class AccessoriesController extends Controller
     public function create()
     {
         $this->authorize('create', Accessory::class);
+        $user =  User::find(Auth::id());
+
+        if($user->isSuperUser()){
+            $userGroups = Group::pluck('name', 'id')->toArray();
+        }else{
+            $userGroups = $user->isAdminofGroup();
+        }
+
+        Log::debug($userGroups);
         $category_type = 'accessory';
         return view('accessories/edit')->with('category_type', $category_type)
-          ->with('item', new Accessory);
+          ->with('item', new Accessory)
+          ->with('groups',$userGroups);
     }
 
 
@@ -83,6 +96,7 @@ class AccessoriesController extends Controller
         
         // Was the accessory created?
         if ($accessory->save()) {
+            $accessory->groups()->sync($request->input('groups'),false);
             // Redirect to the new accessory  page
             return redirect()->route('accessories.index')->with('success', trans('admin/accessories/message.create.success'));
         }
@@ -99,10 +113,30 @@ class AccessoriesController extends Controller
      */
     public function edit($accessoryId = null)
     {
+        $user =  User::find(Auth::id());
 
+        if($user->isSuperUser()){
+            $userGroups = Group::pluck('name', 'id')->toArray();
+        }else{
+            $userGroups = $user->isAdminofGroup();
+        }
+        
         if ($item = Accessory::find($accessoryId)) {
             $this->authorize($item);
-            return view('accessories/edit', compact('item'))->with('category_type', 'accessory');
+            $accessoryGrp= $item->groups()->pluck('name', 'id')->toArray();
+            
+            $result = count(array_intersect($userGroups, $accessoryGrp));
+
+            if($result|| $item->user_id == Auth::id()){
+                return view('accessories/edit', compact('item'))
+                ->with('category_type', 'accessory')
+                ->with('groups',$userGroups);
+            }else{
+                //return redirect()->back()->with('error', 'You can not edit');
+                return redirect()->route('accessories.index')->with('error', 'You can not edit');
+            }
+
+            
         }
 
         return redirect()->route('accessories.index')->with('error', trans('admin/accessories/message.does_not_exist'));
@@ -145,6 +179,7 @@ class AccessoriesController extends Controller
 
         // Was the accessory updated?
         if ($accessory->save()) {
+            $accessory->groups()->sync($request->input('groups'),false);
             return redirect()->route('accessories.index')->with('success', trans('admin/accessories/message.update.success'));
         }
         return redirect()->back()->withInput()->withErrors($accessory->getErrors());
@@ -160,27 +195,45 @@ class AccessoriesController extends Controller
      */
     public function destroy($accessoryId)
     {
-        if (is_null($accessory = Accessory::find($accessoryId))) {
+        $accessory = Accessory::find($accessoryId);
+        if (is_null($accessory)) {
             return redirect()->route('accessories.index')->with('error', trans('admin/accessories/message.not_found'));
         }
 
         $this->authorize($accessory);
 
+        $user =  User::find(Auth::id());
 
+        if($user->isSuperUser()){
+            $userGroups = Group::pluck('name', 'id')->toArray();
+        }else{
+            $userGroups = $user->isAdminofGroup();
+        }
+
+        $accessoryGrp= $accessory->groups()->pluck('name', 'id')->toArray();
+
+        $result = count(array_intersect($userGroups, $accessoryGrp));
+       
         if ($accessory->hasUsers() > 0) {
              return redirect()->route('accessories.index')->with('error', trans('admin/accessories/message.assoc_users', array('count'=> $accessory->hasUsers())));
         }
 
-        if ($accessory->image) {
-            try  {
-                Storage::disk('public')->delete('accessories'.'/'.$accessory->image);
-            } catch (\Exception $e) {
-                \Log::debug($e);
+        if($result|| $accessory->user_id == Auth::id()){
+            if ($accessory->image) {
+                try  {
+                    Storage::disk('public')->delete('accessories'.'/'.$accessory->image);
+                } catch (\Exception $e) {
+                    \Log::debug($e);
+                }
             }
-        }
 
-        $accessory->delete();
-        return redirect()->route('accessories.index')->with('success', trans('admin/accessories/message.delete.success'));
+            $accessory->delete();
+            return redirect()->route('accessories.index')->with('success', trans('admin/accessories/message.delete.success'));
+        }else{
+            //return redirect()->back()->with('error', 'You can not delete');
+            return redirect()->route('accessories.index')->with('error', 'You can not delete');
+        }
+        
     }
 
 

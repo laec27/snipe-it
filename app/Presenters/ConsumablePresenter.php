@@ -118,6 +118,13 @@ class ConsumablePresenter extends Presenter
                 "visible" => true,
                 "footerFormatter" => 'sumFormatter',
             ],[
+                "field" => "groups",
+                "searchable" => true,
+                "sortable" => true,
+                "title" => trans('general.groups'),
+                "visible" => true,
+                "formatter" => "groupsFormatter"
+            ],[
                 "field" => "change",
                 "searchable" => false,
                 "sortable" => false,

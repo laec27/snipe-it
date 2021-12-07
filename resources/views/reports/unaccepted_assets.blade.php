@@ -44,8 +44,8 @@
               </tr>
             </thead>
             <tbody>
-              @if ($assetsForReport)
-              @foreach ($assetsForReport as $assetItem)
+              @if ($acceptances)
+              @foreach ($acceptances as $assetItem)
                   @if ($assetItem)
                   <tr>
                     <td>{{ ($assetItem->company) ? $assetItem->company->name : '' }}</td>

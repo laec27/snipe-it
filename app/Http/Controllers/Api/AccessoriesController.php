@@ -14,6 +14,7 @@ use Auth;
 use DB;
 use Illuminate\Http\Request;
 use App\Http\Requests\ImageUploadRequest;
+use Illuminate\Support\Facades\Log;
 
 class AccessoriesController extends Controller
 {
@@ -27,6 +28,13 @@ class AccessoriesController extends Controller
     public function index(Request $request)
     {
         $this->authorize('view', Accessory::class);
+	
+	$myArr =array();
+        $userData = Auth::user()->groups;
+
+        foreach($userData as $userGroup){
+            array_push($myArr,$userGroup->id);
+        }
         
         // This array is what determines which fields should be allowed to be sorted on ON the table itself, no relations
         // Relations will be handled in query scopes a little further down.
@@ -43,7 +51,7 @@ class AccessoriesController extends Controller
             ];
 
 
-        $accessories = Accessory::select('accessories.*')->with('category', 'company', 'manufacturer', 'users', 'location', 'supplier');
+        $accessories = Accessory::select('accessories.*')->with('category', 'company', 'manufacturer', 'users', 'location', 'supplier', 'groups');
 
         if ($request->filled('search')) {
             $accessories = $accessories->TextSearch($request->input('search'));
@@ -65,6 +73,17 @@ class AccessoriesController extends Controller
             $accessories->where('supplier_id','=',$request->input('supplier_id'));
         }
 
+	if(Auth::user()->isSuperUser()){
+        }else{
+            $accessories->whereHas('groups', function($query) use ($myArr){
+                $query->whereIn('group_id', $myArr);
+            })->get();
+            
+        }
+
+        if ($request->filled('search')) {
+            $accessories = $accessories->TextSearch($request->input('search'));
+        }
         if ($request->filled('location_id')) {
             $accessories->where('location_id','=',$request->input('location_id'));
         }
@@ -240,6 +259,7 @@ class AccessoriesController extends Controller
      */
     public function destroy($id)
     {
+        Log::debug('in delete');
         $this->authorize('delete', Accessory::class);
         $accessory = Accessory::findOrFail($id);
         $this->authorize($accessory);

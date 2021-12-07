@@ -7,7 +7,10 @@ use App\Models\PredefinedKit;
 use App\Models\PredefinedLicence;
 use App\Models\PredefinedModel;
 use Illuminate\Http\Request;
-
+use App\Models\User;
+use App\Models\Group;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 /**
  * This controller handles all access kits management:
  * list, add/remove/change
@@ -37,7 +40,15 @@ class PredefinedKitsController extends Controller
     public function create()
     {
         $this->authorize('create', PredefinedKit::class);
-        return view('kits/create')->with('item', new PredefinedKit);
+        $user =  User::find(Auth::id());
+
+        if($user->isSuperUser()){
+            $userGroups = Group::pluck('name', 'id')->toArray();
+        }else{
+            $userGroups = $user->isAdminofGroup();
+        }
+        return view('kits/create')->with('item', new PredefinedKit)
+        ->with('groups',$userGroups);
     }
 
     /**
@@ -60,6 +71,7 @@ class PredefinedKitsController extends Controller
         if (!$success) {
             return redirect()->back()->withInput()->withErrors($kit->getErrors());
         }
+        $kit->groups()->sync($request->input('groups'),false);
         return redirect()->route("kits.index")->with('success', 'Kit was successfully created.'); // TODO: trans()
     }
 
@@ -74,11 +86,29 @@ class PredefinedKitsController extends Controller
     public function edit($kit_id=null)
     {
         $this->authorize('update', PredefinedKit::class);
+        $user =  User::find(Auth::id());
+
+        if($user->isSuperUser()){
+            $userGroups = Group::pluck('name', 'id')->toArray();
+        }else{
+            $userGroups = $user->isAdminofGroup();
+        }
         if ($kit = PredefinedKit::find($kit_id)) {
-            return view('kits/edit')
-                ->with('item', $kit)
-                ->with('models', $kit->models)
-                ->with('licenses', $kit->licenses);
+
+            $kitGrp= $kit->groups()->pluck('name', 'id')->toArray();
+            
+            $result = count(array_intersect($userGroups, $kitGrp));
+
+            if($result|| $kit->user_id == Auth::id()){
+
+                return view('kits/edit')
+                    ->with('item', $kit)
+                    ->with('models', $kit->models)
+                    ->with('licenses', $kit->licenses)
+                    ->with('groups',$userGroups);
+            }else{
+                return redirect()->back()->with('error', 'You can not edit');
+            }
         }
         return redirect()->route('kits.index')->with('error', 'Kit does not exist');        // TODO: trans
     }
@@ -105,6 +135,7 @@ class PredefinedKitsController extends Controller
         $kit->name = $request->input('name');
 
         if ($kit->save()) {
+            $kit->groups()->sync($request->input('groups'),false);
             return redirect()->route("kits.index")->with('success', 'Kit was successfully updated');        // TODO: trans
         }
         return redirect()->back()->withInput()->withErrors($kit->getErrors());
@@ -127,16 +158,33 @@ class PredefinedKitsController extends Controller
             return redirect()->route('kits.index')->with('error', 'Kit not found');     // TODO: trans
         }
 
-        // Delete childs
-        $kit->models()->detach();
-        $kit->licenses()->detach();
-        $kit->consumables()->detach();
-        $kit->accessories()->detach();
-        // Delete the kit
-        $kit->delete();
+        $user =  User::find(Auth::id());
 
-        // Redirect to the kit management page
-        return redirect()->route('kits.index')->with('success', 'Kit was successfully deleted'); // TODO: trans
+        if($user->isSuperUser()){
+            $userGroups = Group::pluck('name', 'id')->toArray();
+        }else{
+            $userGroups = $user->isAdminofGroup();
+        }
+
+        $kitGrp= $kit->groups()->pluck('name', 'id')->toArray();
+
+        $result = count(array_intersect($userGroups, $kitGrp));
+
+        if($result|| $kit->user_id == Auth::id()){
+            // Delete childs
+            $kit->models()->detach();
+            $kit->licenses()->detach();
+            $kit->consumables()->detach();
+            $kit->accessories()->detach();
+            // Delete the kit
+            $kit->delete();
+            // Redirect to the kit management page
+            return redirect()->route('kits.index')->with('success', 'Kit was successfully deleted'); // TODO: trans
+        }else{
+            return redirect()->back()->with('error', 'You can not delete');
+        }
+
+        
     }
 
     /**

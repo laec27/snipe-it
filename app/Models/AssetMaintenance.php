@@ -208,5 +208,9 @@ class AssetMaintenance extends Model implements ICompanyableChild
             ->orderBy('assets.name', $order);
     }
 
+    public function scopeByAssetGroup($query){
+        return $query->leftJoin('assets', 'asset_maintenances.asset_id', '=', 'assets.id')
+            ->where('assets.groups', '1');
+    }
 
 }

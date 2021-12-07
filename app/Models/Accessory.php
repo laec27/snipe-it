@@ -47,7 +47,8 @@ class Accessory extends SnipeModel
         'company'      => ['name'],
         'manufacturer' => ['name'],
         'supplier'     => ['name'],
-        'location'     => ['name']
+        'location'     => ['name'],
+        'groups'       => ['name']
     ];
 
     /**
@@ -206,6 +207,10 @@ class Accessory extends SnipeModel
         return $this->assetlog()->where('action_type','=','checkout')->take(1);
     }
 
+    public function groups()
+    {
+        return $this->belongsToMany('\App\Models\Group', 'accessories_groups');
+    }
 
     /**
      * Sets the full image url

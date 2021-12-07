@@ -104,6 +104,13 @@ class ComponentPresenter extends Presenter
                 "title" => trans('general.purchase_cost'),
                 "visible" => true,
                 "footerFormatter" => 'sumFormatter',
+            ],[
+                "field" => "groups",
+                "searchable" => true,
+                "sortable" => true,
+                "title" => trans('general.groups'),
+                "visible" => true,
+                "formatter" => "groupsFormatter"
             ],
         ];
 
